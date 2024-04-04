@@ -1,0 +1,13 @@
+[book]
+authors = ["jeffersonroth"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Testing mdbook-metadata"
+
+[preprocessor.metadata]
+command = "../../target/release/mdbook-metadata.exe"
+valid-tags = ["title", "description", "author", "keywords", "released"]
+default-author = "Your Name"
+
+[output.html]

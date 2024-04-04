@@ -1,0 +1,23 @@
+[package]
+name = "mdbook-metadata"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jefferson Roth <jjrothfilho@gmail.com>"]
+description = "mdBook preprocessor to parse markdown metadata"
+license = "MIT"
+homepage = "https://github.com/jeffersonroth/mdbook-metadata"
+repository = "https://github.com/jeffersonroth/mdbook-metadata"
+rust-version = "1.76"
+
+[dependencies]
+anyhow = "1.0.81"
+clap = "4.5.4"
+env_logger = "0.11.3"
+lazy_static = "1.4.0"
+log = "0.4.21"
+mdbook = { version = "0.4.37", default-features = false }
+regex = "1.10.4"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.115"
+serde_yaml = "0.9.34"
+walkdir = "2.5.0"

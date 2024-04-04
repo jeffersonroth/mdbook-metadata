@@ -1,0 +1,9 @@
+reference-table:
+  - id: "audita-quot"
+    path: "content/subject-1/audita-quot.md"
+  - id: "aliter-facta-cornibus-tandem"
+    path: "content/subject-1/aliter-facta-cornibus-tandem.md"
+  - id: "bos-quae-inde-limen"
+    path: "content/subject-2/subfolder-1/bos-quae-inde-limen.md"
+  - id: "esse-corpora-achaidas-sacros-ad-quas"
+    path: "content/subject-3/subfolder-1/subsubfolder-1/esse-corpora-achaidas-sacros-ad-quas.md"
