@@ -37,7 +37,7 @@
    ```toml
    [preprocessor.metadata]
    valid-tags = ["title", "author", "keywords", "released"]
-   default-author = "Your Name"
+   default-author = "Jane Doe"
    continue-on-error = true # default: true
    ```
 
