@@ -64,10 +64,24 @@ fn parse_metadata(
     Ok((metadata, content_without_metadata.to_string()))
 }
 
-fn metadata_to_html(metadata: &HashMap<String, String>) -> String {
-    let mut html_tags = String::new();
+fn metadata_to_html(
+    metadata: &HashMap<String, String>,
+    default_values: &HashMap<String, String>,
+) -> String {
+    let mut tags = HashMap::new();
+
+    for (key, value) in default_values {
+        let escaped_value = encode_safe(value);
+        tags.insert(key.clone(), escaped_value);
+    }
+
     for (key, value) in metadata {
-        let escaped_value = encode_safe(&value);
+        let escaped_value = encode_safe(value);
+        tags.insert(key.clone(), escaped_value);
+    }
+
+    let mut html_tags = String::new();
+    for (key, escaped_value) in tags {
         match key.as_str() {
             "title" => html_tags.push_str(&format!("<title>{}</title>\n", escaped_value)),
             _ => html_tags.push_str(&format!(
@@ -76,12 +90,15 @@ fn metadata_to_html(metadata: &HashMap<String, String>) -> String {
             )),
         }
     }
+
     info!("Generated HTML tags: {}", html_tags);
     html_tags
 }
 
+
 pub struct Metadata {
     valid_tags: Option<Vec<String>>, // Optional list of valid tags specified in the configuration
+    default_tag_values: HashMap<String, String>, // Optional map of default tag values
     continue_on_error: bool,         // Optional flag to continue processing after an error occurs
 }
 
@@ -106,8 +123,22 @@ impl Metadata {
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
+        let mut default_tag_values = HashMap::new();
+        if let Some(preprocessor_config) = ctx.config.get_preprocessor("metadata") {
+            for (key, value) in preprocessor_config.iter() {
+                if key.starts_with("default-") {
+                    if let Some(tag) = key.strip_prefix("default-") {
+                        if let Some(value) = value.as_str() {
+                            default_tag_values.insert(tag.to_string(), value.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
         Self {
             valid_tags,
+            default_tag_values,
             continue_on_error,
         }
     }
@@ -133,28 +164,32 @@ impl Preprocessor for Metadata {
 
         book.for_each_mut(|item: &mut BookItem| {
             if let BookItem::Chapter(ref mut chap) = item {
-                match parse_metadata(&chap.content, self.continue_on_error) {
-                    Ok((mut parsed_metadata, modified_content)) => {
-                        if let Some(ref valid_tags) = self.valid_tags {
-                            parsed_metadata.retain(|k, _| valid_tags.contains(k));
-                        }
-
-                        if !parsed_metadata.is_empty() {
-                            let html_tags = metadata_to_html(&parsed_metadata);
-                            chap.content = format!("{}\n{}", html_tags, modified_content);
-                        } else {
-                            chap.content = modified_content;
-                        }
+                if let Ok((parsed_metadata, modified_content)) = parse_metadata(&chap.content, self.continue_on_error) {
+                    let mut metadata = parsed_metadata;
+                    let content = modified_content;
+        
+                    if !metadata.is_empty() && self.valid_tags.is_some() {
+                        metadata = metadata.into_iter()
+                            .filter(|(k, _)| self.valid_tags.as_ref().unwrap().contains(k))
+                            .collect();
                     }
-                    Err(e) => {
-                        let error_msg =
-                            format!("Error parsing metadata in chapter '{}': {}", chap.name, e);
-                        errors.push(error_msg.clone());
-                        error!("{}", error_msg);
-                    }
+        
+                    let html_tags = metadata_to_html(&metadata, &self.default_tag_values);
+        
+                    chap.content = if !html_tags.is_empty() {
+                        format!("{}\n{}", html_tags, content)
+                    } else {
+                        content
+                    };
+                } else if self.continue_on_error {
+                    warn!("Failed to parse metadata for chapter '{}', continuing with original content.", chap.name);
+                } else {
+                    let error_msg = format!("Failed to parse metadata for chapter '{}'.", chap.name);
+                    errors.push(error_msg);
                 }
             }
         });
+        
 
         if errors.is_empty() {
             Ok(book)
@@ -329,7 +364,7 @@ Chapter content."#;
         metadata.insert("keywords".to_string(), "rust, mdbook, testing".to_string());
         metadata.insert("author".to_string(), "John Doe".to_string());
 
-        let html_output = metadata_to_html(&metadata);
+        let html_output = metadata_to_html(&metadata, &HashMap::new());
 
         assert!(
             html_output.contains("<title>Example Title</title>"),
@@ -349,7 +384,7 @@ Chapter content."#;
     fn test_metadata_to_html_empty() {
         let metadata = HashMap::new();
 
-        let html_output = metadata_to_html(&metadata);
+        let html_output = metadata_to_html(&metadata, &HashMap::new());
 
         assert!(
             html_output.is_empty(),
@@ -374,7 +409,7 @@ Chapter content."#;
             ),
         ]);
 
-        let html_output = metadata_to_html(&metadata);
+        let html_output = metadata_to_html(&metadata, &HashMap::new());
 
         let expected_outputs = [
             r#"<title>Complex &amp; &lt;Special&gt; &#x27;Characters&#x27;</title>"#,
@@ -402,7 +437,7 @@ Chapter content."#;
             ),
         ]);
 
-        let html_output = metadata_to_html(&metadata);
+        let html_output = metadata_to_html(&metadata, &HashMap::new());
 
         // Expected outputs should escape the <, >, and other special HTML characters
         let expected_outputs = [
@@ -431,7 +466,7 @@ Chapter content."#;
             ),
         ]);
 
-        let html_output = metadata_to_html(&metadata);
+        let html_output = metadata_to_html(&metadata, &HashMap::new());
 
         let expected_outputs = [
             r#"<title>Normal Title</title>"#,
@@ -459,7 +494,7 @@ Chapter content."#;
             ("complex".to_string(), format!("{:?}", nested_map)),
         ]);
 
-        let html_output = metadata_to_html(&metadata);
+        let html_output = metadata_to_html(&metadata, &HashMap::new());
 
         let expected_html_tags = vec![
         "<title>Complex Structures</title>",
@@ -484,7 +519,7 @@ Chapter content."#;
             metadata.insert(format!("key_{}", i), format!("value_{}", i));
         }
 
-        let html_output = metadata_to_html(&metadata);
+        let html_output = metadata_to_html(&metadata, &HashMap::new());
 
         for i in 0..1000 {
             let expected_key = format!("key_{}", i);
@@ -505,6 +540,83 @@ Chapter content."#;
         assert!(
             !html_output.contains("<title>"),
             "The HTML output should not contain a title tag when not specified in the metadata."
+        );
+    }
+
+    #[test]
+    fn metadata_empty_default_values_empty() {
+        let metadata = HashMap::new();
+        let default_values = HashMap::new();
+
+        let html_output = metadata_to_html(&metadata, &default_values);
+
+        assert!(html_output.is_empty(), "HTML output should be empty when both metadata and default values are empty.");
+    }
+
+    #[test]
+    fn metadata_empty_default_values_not_empty() {
+        let metadata = HashMap::new();
+        let mut default_values = HashMap::new();
+        default_values.insert("author".to_string(), "Jane Doe".to_string());
+
+        let html_output = metadata_to_html(&metadata, &default_values);
+
+        assert!(html_output.contains("<meta name=\"author\" content=\"Jane Doe\">"), "HTML output should contain default values when metadata is empty.");
+    }
+
+    #[test]
+    fn metadata_not_empty_default_values_not_empty_conflicting_values() {
+        let mut metadata = HashMap::new();
+        metadata.insert("author".to_string(), "John Doe".to_string());
+
+        let mut default_values = HashMap::new();
+        default_values.insert("author".to_string(), "Jane Doe".to_string());
+
+        let html_output = metadata_to_html(&metadata, &default_values);
+
+        assert!(html_output.contains("<meta name=\"author\" content=\"John Doe\">"), "Metadata values should override default values when both are present.");
+    }
+
+    #[test]
+    fn metadata_not_empty_default_values_not_empty_metadata_has_extra_tags() {
+        let mut metadata = HashMap::new();
+        metadata.insert("author".to_string(), "John Doe".to_string());
+        metadata.insert("keywords".to_string(), "rust, mdbook".to_string());
+
+        let mut default_values = HashMap::new();
+        default_values.insert("description".to_string(), "Sample book".to_string());
+
+        let html_output = metadata_to_html(&metadata, &default_values);
+
+        assert!(html_output.contains("<meta name=\"author\" content=\"John Doe\">") && html_output.contains("<meta name=\"keywords\" content=\"rust, mdbook\">") && html_output.contains("<meta name=\"description\" content=\"Sample book\">"), "HTML output should include all tags from both metadata and default values, with metadata taking precedence.");
+    }
+
+    #[test]
+    fn default_values_has_tags_not_in_metadata() {
+        let mut metadata = HashMap::new();
+        metadata.insert("author".to_string(), "John Doe".to_string());
+
+        let mut default_values = HashMap::new();
+        default_values.insert("author".to_string(), "Jane Doe".to_string());
+        default_values.insert("keywords".to_string(), "rust, mdbook".to_string());
+
+        let html_output = metadata_to_html(&metadata, &default_values);
+
+        assert!(html_output.contains("<meta name=\"author\" content=\"John Doe\">") && html_output.contains("<meta name=\"keywords\" content=\"rust, mdbook\">"), "HTML output should include tags from metadata and default values not present in metadata, with metadata values taking precedence.");
+    }
+
+    #[test]
+    fn special_characters_in_metadata() {
+        let mut metadata = HashMap::new();
+        metadata.insert("description".to_string(), "This & That <test>".to_string());
+
+        let default_values = HashMap::new(); // Empty default values for simplicity
+
+        let html_output = metadata_to_html(&metadata, &default_values);
+
+        assert!(
+            html_output.contains("<meta name=\"description\" content=\"This &amp; That &lt;test&gt;\">"),
+            "HTML output should correctly escape special characters in metadata values."
         );
     }
 }
