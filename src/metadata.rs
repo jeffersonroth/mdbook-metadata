@@ -13,9 +13,7 @@ use std::fmt;
 use crate::cli::NAME;
 
 lazy_static! {
-    // Regex to capture metadata blocks
     static ref METADATA_BLOCK_RE: Regex = Regex::new(r"(?s)---(.*?)---").unwrap();
-    // Regex to parse individual metadata lines
     static ref METADATA_LINE_RE: Regex = Regex::new(r"^(.+?):\s*(.+)$").unwrap();
 }
 
@@ -63,13 +61,13 @@ fn parse_metadata(
         }
     }
     info!("Parsed metadata: {:?}", metadata);
-    Ok((metadata, content_without_metadata.to_string())) // Always returns Ok, even if the metadata block is absent.
+    Ok((metadata, content_without_metadata.to_string()))
 }
 
 fn metadata_to_html(metadata: &HashMap<String, String>) -> String {
     let mut html_tags = String::new();
     for (key, value) in metadata {
-        let escaped_value = encode_safe(&value); // Escape special HTML characters
+        let escaped_value = encode_safe(&value);
         match key.as_str() {
             "title" => html_tags.push_str(&format!("<title>{}</title>\n", escaped_value)),
             _ => html_tags.push_str(&format!(
@@ -106,7 +104,7 @@ impl Metadata {
             .get_preprocessor("metadata")
             .and_then(|p| p.get("continue-on-error").cloned())
             .and_then(|v| v.as_bool())
-            .unwrap_or(true); // Default to true if not specified
+            .unwrap_or(true);
 
         Self {
             valid_tags,
@@ -137,17 +135,15 @@ impl Preprocessor for Metadata {
             if let BookItem::Chapter(ref mut chap) = item {
                 match parse_metadata(&chap.content, self.continue_on_error) {
                     Ok((mut parsed_metadata, modified_content)) => {
-                        // Filter metadata against valid_tags if present
                         if let Some(ref valid_tags) = self.valid_tags {
                             parsed_metadata.retain(|k, _| valid_tags.contains(k));
                         }
 
-                        // Generate HTML tags if metadata is not empty after potential filtering
                         if !parsed_metadata.is_empty() {
                             let html_tags = metadata_to_html(&parsed_metadata);
                             chap.content = format!("{}\n{}", html_tags, modified_content);
                         } else {
-                            chap.content = modified_content; // Use modified content if no metadata
+                            chap.content = modified_content;
                         }
                     }
                     Err(e) => {
@@ -303,13 +299,11 @@ Chapter content."#;
         let (metadata, content_without_metadata) =
             parse_metadata(content_with_duplicate_keys, true).unwrap();
 
-        // Verifying that the content doesn't include the metadata block
         assert_eq!(
             content_without_metadata, "Chapter content.",
             "The content should exclude the metadata block."
         );
 
-        // Checking that the last occurrence of each duplicate key is the one that's retained
         assert_eq!(
             metadata.get("title"),
             Some(&"Second Title".to_string()),
@@ -321,7 +315,6 @@ Chapter content."#;
             "The 'keywords' key should reflect the last occurrence."
         );
 
-        // The metadata HashMap should only contain two entries despite the duplicates
         assert_eq!(
             metadata.len(),
             2,
@@ -354,11 +347,10 @@ Chapter content."#;
 
     #[test]
     fn test_metadata_to_html_empty() {
-        let metadata = HashMap::new(); // An empty HashMap
+        let metadata = HashMap::new();
 
         let html_output = metadata_to_html(&metadata);
 
-        // Expect the HTML output to be empty, since there was no metadata to convert
         assert!(
             html_output.is_empty(),
             "HTML output should be empty for empty metadata."
@@ -419,7 +411,6 @@ Chapter content."#;
             r#"<meta name="script_injection" content="&lt;script&gt;alert(&#x27;XSS&#x27;);&lt;&#x2F;script&gt;">"#,
         ];
 
-        // Split the output by newline and collect into a set for order-independent comparison
         let html_output_set: HashSet<_> = html_output.lines().collect();
         let expected_output_set: HashSet<_> = expected_outputs.iter().cloned().collect();
 
@@ -442,14 +433,11 @@ Chapter content."#;
 
         let html_output = metadata_to_html(&metadata);
 
-        // Adjust the expected output to include the encoded forward slash
         let expected_outputs = [
             r#"<title>Normal Title</title>"#,
-            // Include the encoded forward slash in the expected output
             r#"<meta name="description" content="&lt;script&gt;alert(&quot;malicious code&quot;);&lt;&#x2F;script&gt;">"#,
         ];
 
-        // Split the output by newline and collect into a set for order-independent comparison
         let html_output_set: HashSet<_> = html_output.lines().collect();
         let expected_output_set: HashSet<_> = expected_outputs.iter().cloned().collect();
 
@@ -473,7 +461,6 @@ Chapter content."#;
 
         let html_output = metadata_to_html(&metadata);
 
-        // The nested map should be converted to a string and properly escaped
         let expected_html_tags = vec![
         "<title>Complex Structures</title>",
         r#"<meta name="complex" content="{&quot;nested_key&quot;: [&quot;value1&quot;, &quot;value2&quot;]}">"#,
@@ -499,7 +486,6 @@ Chapter content."#;
 
         let html_output = metadata_to_html(&metadata);
 
-        // Verify that all metadata entries are converted to HTML tags
         for i in 0..1000 {
             let expected_key = format!("key_{}", i);
             let expected_value = format!("value_{}", i);
@@ -516,7 +502,6 @@ Chapter content."#;
             );
         }
 
-        // Ensure the title tag is not present, as it was not part of the metadata
         assert!(
             !html_output.contains("<title>"),
             "The HTML output should not contain a title tag when not specified in the metadata."

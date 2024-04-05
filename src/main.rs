@@ -18,7 +18,6 @@ fn main() {
 
     let (ctx, book) = CmdPreprocessor::parse_input(io::stdin()).expect("Failed to parse input");
 
-    // Use Metadata::new to initialize the preprocessor so it can set up based on the context
     let preprocessor = Metadata::new(&ctx);
 
     let processed_book = preprocessor
