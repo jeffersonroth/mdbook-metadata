@@ -37,7 +37,8 @@
    ```toml
    [preprocessor.metadata]
    valid-tags = ["title", "author", "keywords", "released"]
-   default-author = "Your Name<your_name@email.com>"
+   default-author = "Jane Doe"
+   continue-on-error = true # default: true
    ```
 
 3. Add metadata to your markdown file:
@@ -45,7 +46,7 @@
    ```markdown
    ---
     title: Example
-    author: Your Name<your_name@mail.com>
+    author: Your Name
     keywords: tag1, tag2
     released: false
     ---

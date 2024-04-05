@@ -1,6 +1,6 @@
 [package]
 name = "mdbook-metadata"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Jefferson Roth <jjrothfilho@gmail.com>"]
 description = "mdBook preprocessor to parse markdown metadata"
@@ -13,6 +13,7 @@ rust-version = "1.76"
 anyhow = "1.0.81"
 clap = "4.5.4"
 env_logger = "0.11.3"
+html-escape = "0.2.13"
 lazy_static = "1.4.0"
 log = "0.4.21"
 mdbook = { version = "0.4.37", default-features = false }
